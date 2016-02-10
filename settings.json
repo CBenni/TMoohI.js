@@ -1,0 +1,33 @@
+{
+	"ref-channels": {
+		"eventchat": "#riotgames",
+		"normalchat": "#cbenni"
+	},
+	"servers": {
+		"irc":{
+			"port": 6667,
+			"host": "localhost",
+			"module": "./server/irc_server",
+			"cluster-seperator": "@",
+			"permissions": ["chat","logs"]
+		},
+		"ws_irc":{
+			"port": 420,
+			"host": "localhost",
+			"module": "./server/websocket",
+			"cluster-seperator": "@",
+			"permissions": ["logs"]
+		}
+	},
+	"logging": [
+		{
+			"module": "./logging/file",
+			"filename": "tmoohi_%Y_%m_%d.log",
+			"filter": {"level__ge": 20}
+		},
+		{
+			"module": "./logging/console",
+			"filter": {"level__ge": 10}
+		}
+	]
+}

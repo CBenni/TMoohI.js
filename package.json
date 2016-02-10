@@ -1,0 +1,27 @@
+{
+  "name": "tmoohijs",
+  "version": "1.0.0",
+  "description": "node.js port of TMoohI",
+  "main": "tmoohi.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CBenni/tmoohijs.git"
+  },
+  "keywords": [
+    "tmoohi",
+    "twitch"
+  ],
+  "author": "CBenni",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/CBenni/tmoohijs/issues"
+  },
+  "homepage": "https://github.com/CBenni/tmoohijs#readme",
+  "dependencies": {
+    "crypto": "0.0.3",
+    "node_hash": "^0.2.0"
+  }
+}
