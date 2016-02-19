@@ -1,4 +1,5 @@
 var net = require("net");
+var _ = require("lodash");
 var argv = require('yargs')
 	.usage('Usage: $0 <command> [options]')
 	.example('$0 --config ./some_config.json')
@@ -11,8 +12,7 @@ var argv = require('yargs')
 var usermanager = require("./lib/usermanager");
 var messageparser = require("./lib/messageparser")
 
-function merge(x,y){var t=typeof x;if(t=="object"){var k=Object.keys(y),i=0;for(;i<k.length;++i)x[k[i]]=merge(x[k[i]],y[k[i]]);return x}else return y}
-var settings = merge(require(argv.config), argv);
+var settings = require(argv.config);
 /**
 GENERAL INFO
 
@@ -30,6 +30,7 @@ class TMoohI {
 		self.settings = settings;
 		// start the server, create the usermanager
 		self.manager = new usermanager(settings);
+		this.loadLoggers();
 		this.loadServers();
 	}
 	
@@ -37,9 +38,16 @@ class TMoohI {
 		var serversettings = Object.keys(settings.servers);
 		for(var i=0;i<serversettings.length;++i) {
 			var servername = serversettings[i];
-			var serversettings = settings.servers[servername];
+			var serversetting = settings.servers[servername];
 			
-			var server = new require(serversettings.module)(this, servername, serversettings);
+			var server = new require(serversetting.module)(this, servername, serversetting);
+		}
+	}
+	
+	loadLoggers() {
+		for(var i=0;i<settings.loggers.length;++i) {
+			var loggersetting = settings.loggers[i];
+			var logger = new require(loggersetting.module)(loggersetting.filters, loggersetting);
 		}
 	} 
 }
