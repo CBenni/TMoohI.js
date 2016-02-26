@@ -22,8 +22,11 @@
   "homepage": "https://github.com/CBenni/tmoohijs#readme",
   "dependencies": {
     "crypto": "0.0.3",
+    "jsonfile": "^2.2.3",
     "lodash": "^4.3.0",
     "node_hash": "^0.2.0",
-    "strftime": "^0.9.2"
+    "strftime": "^0.9.2",
+    "ws": "^1.0.1",
+    "yargs": "^4.1.0"
   }
 }

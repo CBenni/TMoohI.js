@@ -7,19 +7,19 @@
 		"irc":{
 			"port": 6667,
 			"host": "localhost",
-			"module": "./server/irc_server",
+			"module": "./lib/servers/irc_server",
 			"cluster-seperator": "@",
 			"permissions": ["chat","logs"]
 		}
 	},
 	"loggers": [
 		{
-			"module": "./logging/file",
+			"module": "./lib/logging/file",
 			"filename": "tmoohi_%Y_%m_%d.log",
 			"filters": [{"level__ge": 20}]
 		},
 		{
-			"module": "./logging/console",
+			"module": "./lib/logging/console",
 			"filters": [{"level__ge": 10}]
 		}
 	]
