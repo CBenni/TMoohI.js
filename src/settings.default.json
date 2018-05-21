@@ -1,0 +1,10 @@
+{
+	"server": {
+		"port": 3141,
+		"host": "localhost"
+	},
+	"logger": {
+		"level": "debug",
+		"name": "tmoohijs"
+	}
+}

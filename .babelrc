@@ -1,0 +1,11 @@
+{
+  "sourceMaps": "inline",
+  "presets": [
+    ["env", {
+      "targets": {
+        "node": "current"
+      }
+    }]
+  ],
+  "plugins": ["git-version"]
+}
