@@ -12,7 +12,7 @@
       "never"
     ],
     "no-param-reassign": "off",
-    "no-plusplus": ["error", { "allowForLoopAfterthoughts": true }],
+    "no-plusplus": "off",
     "arrow-parens": [
       2,
       "as-needed"
@@ -23,6 +23,7 @@
     "no-mixed-operators": "off",
     "newline-per-chained-call": "off",
     "class-methods-use-this": "off",
+    "prefer-destructuring": "off",
     "max-len": [
       1,
       150

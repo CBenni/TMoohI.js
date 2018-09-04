@@ -1,10 +1,39 @@
 {
 	"server": {
-		"port": 3141,
+		"port": 6667,
 		"host": "localhost"
 	},
 	"logger": {
 		"level": "debug",
 		"name": "tmoohijs"
-	}
+  },
+  "tmi": {
+    "host": "irc.chat.twitch.tv",
+    "port": "6667"
+  },
+  "firehose": {
+    "url": "https://tmi.twitch.tv/firehose",
+    "oauth": ""
+  },
+  "limits": {
+    "channelsPerConnection": 50,
+    "join": {
+      "parent": "connection",
+      "interval": 10000,
+      "limit": 45
+    },
+    "connect": {
+      "interval": 10000,
+      "limit": 45
+    },
+    "message": {
+      "parent": "user",
+      "interval": 30000,
+      "limit": 20
+    },
+    "twitchAPI": {
+      "interval": 1000,
+      "limit": 10
+    }
+  }
 }
