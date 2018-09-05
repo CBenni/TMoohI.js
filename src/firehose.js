@@ -17,16 +17,26 @@ class Firehose extends EventEmitter {
     this.connection = new EventSource(url);
 
     this.connection.addEventListener('privmsg', event => {
-      this.emit('event', JSON.parse(event.data));
+      // normalize the event data into the IRC format
       const eventData = JSON.parse(event.data);
+      this.emit('event', eventData);
       const tagData = {};
       _.each(eventData.tags.split(';'), tag => {
         const [key, val] = tag.split('=');
         tagData[key] = val;
       });
-      eventData.rawTags = eventData.tags;
-      eventData.tags = tagData;
-      this.emit(`PRIVMSG-$${tagData['room-id']}`, eventData);
+      tagData.firehose = '1';
+      const ircData = {
+        tags: tagData,
+        prefix: `${eventData.nick}!${eventData.nick}@${eventData.nick}.tmi.twitch.tv`,
+        command: eventData.command.toUpperCase() || 'PRIVMSG',
+        params: [eventData.room],
+        trailing: eventData.body,
+        source: 'firehose'
+      };
+      ircData.raw = `@${eventData.tags} :${ircData.prefix} ${ircData.command} ${eventData.room} :${ircData.trailing}`;
+
+      this.emit('message', ircData);
     });
 
     this.connection.addEventListener('error', error => {

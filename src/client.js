@@ -5,7 +5,9 @@ import ircNumerics from './irc-numerics';
 import logger from './logger';
 import { setToString } from './helpers';
 import userManager from './usermanager';
+import firehose from './firehose';
 import { getUptime } from './statsmanager';
+import settings from './settings';
 
 const capabilities = [
   'twitch.tv/tags',
@@ -13,6 +15,19 @@ const capabilities = [
   'tmoohi/knownBot',
   'tmoohi/verifiedBot'
 ];
+
+const COMMANDS_PREFER_FIREHOSE = new Set([
+  'PRIVMSG',
+  'USERNOTICE'
+]);
+
+const COMMANDS_TMI = new Set([
+  'WHISPER',
+  'HOSTTARGET',
+  'NOTICE',
+  'USERSTATE',
+  'ROOMSTATE'
+]);
 
 export default class Client {
   constructor(socket) {
@@ -22,17 +37,20 @@ export default class Client {
     this.pass = null;
     this.user = null;
     this.capabilities = new Set();
-    this.channels = [];
+    this.channelsByID = new Set();
+    this.channelsByName = new Set();
 
     socket.pipe(createStream())
     .on('data', message => {
-      logger.debug('Received client message: ', message);
+      logger.debug('<-- ', message);
       this.handleClientMessage(message);
     })
     .on('close', () => {
       logger.debug('Client connection closed', this);
       this.handleDisconnect();
     });
+
+    this.messageCallback = message => this.handleTMIMessage(message);
   }
 
   /*
@@ -48,6 +66,9 @@ export default class Client {
     if (this.name && this.pass) {
       this.user = userManager.getUser(this.name, this.pass);
       this.user.registerClient(this);
+      this.user.on('message', this.messageCallback);
+      firehose.on('message', this.messageCallback);
+
       this.sendNumeric('RPL_WELCOME', this.name, 'Welcome, GLHF!');
       this.sendNumeric('RPL_YOURHOST', this.name, 'Your host is tmi.twitch.tv!');
       this.sendNumeric('RPL_CREATED', this.name, `TMoohI has been running for ${getUptime()}`);
@@ -106,10 +127,11 @@ export default class Client {
 
   handleClientJOIN(msg) {
     if (this.user) {
-      _.each(msg.params[0].split(','), channelName => {
-        this.user.joinChannel(this, channelName).then(() => {
-
-        });
+      _.each(msg.params[0].split(','), async channelName => {
+        await this.user.joinChannel(this, channelName);
+        this.send(`:${this.name}!${this.name}@${this.name}.tmi.twitch.tv JOIN ${channelName}`);
+        if (channelName[0] === '#') this.channelsByName.add(channelName);
+        else if (channelName[0] === '&') this.channelsByID.add(channelName.slice(1));
       });
     } else {
       this.sendNumeric('ERR_NOLOGIN', '', 'Not logged in yet.');
@@ -147,6 +169,24 @@ export default class Client {
       } else {
         this.send(`:tmi.twitch.tv CAP * NAK :${msg.trailing}`);
       }
+    }
+  }
+
+  handleTMIMessage(msg) {
+    if (!COMMANDS_PREFER_FIREHOSE.has(msg.command) && !COMMANDS_TMI.has(msg.command)) return;
+    else if (COMMANDS_PREFER_FIREHOSE.has(msg.command) && settings.firehose.oauth && msg.source !== 'firehose') return;
+
+    // check if the channel is joined either by name or by ID
+    const channelsToEmit = [];
+    if (this.channelsByName.has(msg.params[0])) channelsToEmit.push(msg.params[0]);
+    if (this.channelsByID.has(msg.tags['room-id'])) channelsToEmit.push(`&${msg.tags['room-id']}`);
+    msg.tags['channel-name'] = msg.params[0].slice(1);
+
+    if (channelsToEmit.length > 0) {
+      const rawTags = _.map(msg.tags, (val, key) => `${key}=${val}`).join(';');
+      _.each(channelsToEmit, channel => {
+        this.send(`@${rawTags} :${msg.prefix} ${msg.command} ${channel} :${msg.trailing}`);
+      });
     }
   }
 }

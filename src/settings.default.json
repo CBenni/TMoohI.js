@@ -16,6 +16,7 @@
     "oauth": ""
   },
   "limits": {
+    "maxConnectionLoad": 0.75,
     "channelsPerConnection": 50,
     "join": {
       "parent": "connection",

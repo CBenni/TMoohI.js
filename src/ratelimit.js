@@ -8,11 +8,12 @@ export class RateLimitHolder {
 }
 
 export class RateLimit {
-  constructor(options) {
+  constructor(options, parent) {
     this.options = options;
     this.events = [];
     this.queue = [];
     this.timeout = null;
+    this.parent = parent;
   }
 
   // purges the events list to make room for new events
@@ -57,7 +58,7 @@ export class RateLimit {
 
   run(queueItem) {
     try {
-      const result = queueItem.callback();
+      const result = queueItem.callback(this);
       if (result !== false) {
         this.addEvent();
       }
@@ -78,6 +79,24 @@ export class RateLimit {
   addEvent() {
     this.events.push(perfNow());
   }
+
+  // the wait time is how long itll take (approximately) until a new event can be executed
+  getWaitTime() {
+    this.purge();
+    // if theres less events in the queue and in the event list than the limit allows, we can do it immediately
+    if ((this.events.length + this.queue.length) < this.options.limit) {
+      return 0;
+    }
+    // a good approximation to the wait time is to fill the event list with queue items and to assume the remaining queue is
+    // handled in regular intervals. This isnt 100% precise, but avoids an O(n) iteration
+    return (this.queue.length + this.events.length - this.options.limit) * this.options.interval;
+  }
+
+  getQueueLength() {
+    this.purge();
+    // if theres less events in the queue and in the event list than the limit allows, we can do it immediately
+    return this.events.length + this.queue.length;
+  }
 }
 
 class RateLimitManager extends RateLimitHolder {
@@ -92,23 +111,17 @@ class RateLimitManager extends RateLimitHolder {
           parents = [parentConfig];
         }
         if (parents.length < 1) throw new Error('No parent found for ', limitID, options);
-        let executed = false;
-        return new Promise((resolve, reject) => {
-          _.each(parents, parent => {
-            if (!parent._limits) parent._limits = {};
-            if (!parent._limits[limitID]) parent._limits[limitID] = new RateLimit(options);
-            const limit = parent._limits[limitID];
-            return limit.invoke(() => {
-              if (!executed) {
-                executed = true;
-                const result = callback();
-                resolve(result);
-                return callback();
-              }
-              return false;
-            });
-          });
+        // find the parent with the shortest wait time (aka queue length)
+        const parentToUse = _.minBy(parents, parent => {
+          if (parent._limits) {
+            if (parent._limits[limitID]) return parent._limits[limitID].getQueueLength();
+          }
+          return 0;
         });
+        if (!parentToUse._limits) parentToUse._limits = {};
+        if (!parentToUse._limits[limitID]) parentToUse._limits[limitID] = new RateLimit(options, parentToUse);
+        const limit = parentToUse._limits[limitID];
+        return limit.invoke(callback);
       } throw new Error('Parent not found for ', limitID, options);
     } else {
       throw new Error('Limit not found:', limitID);

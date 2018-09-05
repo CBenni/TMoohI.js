@@ -37,7 +37,7 @@ export function formatTimespan(timespan) {
 export function invokeRateLimit(limitID, context, callback) {
   if (!settings.limits[limitID]) logger.warn(`Cannot find config for limit '${limitID}'`);
   const options = _.extend({}, settings.limits[limitID]);
-  const parent = context[options.parent];
-  if (options.parent && !parent) logger.error(`Cannot find parent for limit '${limitID}'`);
+  options.parent = context[options.parent];
+  if (options.parent && !options.parent) logger.error(`Cannot find parent for limit '${limitID}'`);
   return rateLimitManager.invoke(limitID, options, callback);
 }
