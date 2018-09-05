@@ -6,7 +6,7 @@ class UserManager {
   }
 
   getUser(name, oauth) {
-    const id = `${name}:${oauth}`;
+    const id = `${name}`;
     let user = this.users.get(id);
     if (!user) {
       user = new User(name, oauth);

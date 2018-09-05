@@ -53,4 +53,9 @@ export default class TMIConnection extends EventEmitter {
     this.send(`JOIN ${channelName}`);
     this.channels.push(channelName);
   }
+
+  partChannel(channelName) {
+    this.send(`PART ${channelName}`);
+    _.pull(this.channels, channelName);
+  }
 }

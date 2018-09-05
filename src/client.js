@@ -117,12 +117,9 @@ export default class Client {
   }
 
   handleClientPASS(msg) {
-    if (this.name) {
-      this.sendNumeric('ERR_ALREADYREGISTRED', '', 'Already registered.');
-    } else {
-      this.pass = msg.params[0];
-      this.logIn();
-    }
+    this.pass = msg.params[0];
+    if (this.user) this.user.oauth = this.pass;
+    else this.logIn();
   }
 
   handleClientJOIN(msg) {
