@@ -7,7 +7,7 @@
     "start": "babel-node src/tmoohi.js --inspect",
     "dev": "nodemon --exec yarn start",
     "build": "babel -d dist -w src/ -s --copy-files",
-    "test": "babel-node test/index.js --inspect",
+    "test": "mocha --require @babel/register ./test/*.js",
     "ci": "nodemon --exec yarn test"
   },
   "repository": {
@@ -25,10 +25,13 @@
     "@babel/core": "^7.0.0",
     "@babel/node": "^7.0.0",
     "@babel/preset-env": "^7.0.0",
+    "@babel/register": "^7.0.0",
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.12.0",
     "mocha": "^5.2.0",
+    "should-sinon": "^0.0.6",
+    "sinon": "^6.2.0",
     "source-map-support": "^0.5.9"
   },
   "dependencies": {

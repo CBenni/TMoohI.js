@@ -57,9 +57,22 @@ export default class User extends EventEmitter {
     });
   }
 
+  getChannelObj(channel) {
+    if (channel[0] === '#') {
+      const slicedName = channel.slice(1);
+      const channelObj = this.channelsByName.get(slicedName);
+      if (channelObj) return channelObj;
+    } else if (channel[0] === '&') {
+      const channelID = channel.slice(1);
+      const channelObj = this.channelsByID.get(channelID);
+      if (channelObj) return channelObj;
+    }
+    return null;
+  }
+
   async joinChannel(client, channel) {
-    // channelName is a string, either '#channelname' or '$channelid'
-    channel = channel.toLowerCase();
+    // channel is a string, either '#channelname' or '&channelid'
+    if (!channel) return;
     // if we have a channel name, we can immediately join it on IRC and filter on firehose (if applicable) until a message is sent
     // in the channel, allowing us to fill in the ID
     let channelObj;
@@ -75,7 +88,10 @@ export default class User extends EventEmitter {
       const channelID = channel.slice(1);
 
       channelObj = this.channelsByID.get(channelID);
-      if (!channelObj) { channelObj = new Channel(channelID, null); this.channelsByID.set(channelID, channelObj); }
+      if (!channelObj) {
+        channelObj = new Channel(channelID, null);
+        this.channelsByID.set(channelID, channelObj);
+      }
       channelObj.referenceCount += 1;
 
       // we check if firehose is present. If it isnt, we have to grab the channel name via the twitch API
@@ -89,14 +105,41 @@ export default class User extends EventEmitter {
           return `#${user.name}`;
         });
       }
-    } else if (channel === '*') {
+    } else if (channel === '!firehose') {
       // nothing to do in this case, just set up a filter
     } else {
       throw new Error(`Invalid channel name ${channel}`);
     }
     this.checkConnectionFillStatus();
-    if (channelObj.name && !channelObj.connection) {
-      this.joinIRCChannel(channelObj);
+    channelObj.name.then(() => {
+      if (channelObj && channelObj.referenceCount > 0 && !channelObj.connection) {
+        this.joinIRCChannel(channelObj);
+      }
+    });
+  }
+
+  partChannel(client, channel) {
+    let channelObj;
+    if (channel[0] === '#') {
+      const slicedName = channel.slice(1);
+      channelObj = this.channelsByName.get(slicedName);
+      if (!channelObj) return;
+      channelObj.referenceCount -= 1;
+    } else if (channel[0] === '&') {
+      const channelID = channel.slice(1);
+
+      channelObj = this.channelsByID.get(channelID);
+      if (!channelObj) return;
+      channelObj.referenceCount -= 1;
+    } else if (channel === '!firehose') {
+      // nothing to do in this case, just set up a filter
+    } else {
+      throw new Error(`Invalid channel name ${channel}`);
+    }
+    this.checkConnectionFillStatus();
+    if (channelObj && channelObj.referenceCount === 0 && !channelObj.connection) {
+      this.partIRCChannel(channelObj);
+      channelObj.connection = null;
     }
   }
 
@@ -118,15 +161,15 @@ export default class User extends EventEmitter {
           this.channelsByName.set(channelName, channelObjByID);
         }
       } else {
-        if (channelObjByID.name) {
+        /* if (channelObjByID.name) {
           // channel got renamed, leave old channel and join new one
           logger.info(`Channel ${channelObjByID.name} got renamed to ${channelName}`);
           channelObjByID.connection.partChannel(channelObjByID.name);
           channelObjByID.connection.joinChannel(channelName);
-        }
+        } */
         channelObjByID.name = channelName;
-        this.channelsByName.set(channelName, channelObjByID);
-        this.joinIRCChannel(channelObjByID);
+        // this.channelsByName.set(channelName, channelObjByID);
+        // this.joinIRCChannel(channelObjByID);
       }
     } else if (channelObjByName) {
       channelObjByName.id = channelID;
@@ -139,7 +182,6 @@ export default class User extends EventEmitter {
       res += connection.channels.length;
       return res;
     }, 0);
-    console.log('Total channel count:', totalChannels);
     if (totalChannels >= settings.limits.maxConnectionLoad * settings.limits.channelsPerConnection * this.connections.length) {
       this.createConnection();
       this.checkConnectionFillStatus();
@@ -149,11 +191,11 @@ export default class User extends EventEmitter {
   async joinIRCChannel(channelObj) {
     this.checkConnectionFillStatus();
     // find a connection to use for this channel
-    await invokeRateLimit('join', {
+    return invokeRateLimit('join', {
       user: this,
       client: this.clients,
       connection: _.filter(this.connections, conn => conn.channels.length < settings.limits.channelsPerConnection)
-    }, ratelimit => {
+    }, async ratelimit => {
       // TODO: check if we left the channel again in the meantime
       const ratelimitParent = ratelimit.parent;
       let connectionToUse;
@@ -168,12 +210,32 @@ export default class User extends EventEmitter {
 
       if (connectionToUse) {
         channelObj.connection = connectionToUse;
-        connectionToUse.joinChannel(`#${channelObj.name}`);
+        connectionToUse.joinChannel(`#${await channelObj.name}`);
       } else {
         // somehow we ran out of connections to use... yikerz.
         this.joinIRCChannel(channelObj);
         logger.error('No connections with remaining capacity found.');
       }
+    });
+  }
+
+  async sendMessage(channel, text) {
+    const channelObj = this.getChannelObj(channel);
+    if (!channelObj) return null;
+    const channelName = await channelObj.name;
+    return invokeRateLimit('message', {
+      user: this,
+      client: this.clients,
+      connection: this.connections
+    }, ratelimit => {
+      const ratelimitParent = ratelimit.parent;
+      let connectionToUse;
+      if (ratelimitParent instanceof TMIConnection) {
+        connectionToUse = ratelimitParent;
+      } else {
+        connectionToUse = _.sample(this.connections);
+      }
+      connectionToUse.send(`PRIVMSG #${channelName} :${text}`);
     });
   }
 }

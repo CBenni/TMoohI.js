@@ -41,3 +41,24 @@ export function invokeRateLimit(limitID, context, callback) {
   if (options.parent && !options.parent) logger.error(`Cannot find parent for limit '${limitID}'`);
   return rateLimitManager.invoke(limitID, options, callback);
 }
+
+export function declareAsyncProperty(thisArg, name, value) {
+  let propertyValue = value;
+  let propertyResolve = null;
+  const propertyPromise = value ? Promise.resolve() : new Promise(resolve => {
+    propertyResolve = resolve;
+  });
+  Object.defineProperty(thisArg, name, {
+    get() {
+      return propertyPromise.then(() => propertyValue);
+    },
+    set(val) {
+      if (thisArg.emit) thisArg.emit(`change-${name}`, val, propertyValue);
+      propertyValue = val;
+      if (propertyResolve) {
+        propertyResolve();
+        propertyResolve = null;
+      }
+    }
+  });
+}

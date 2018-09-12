@@ -39,6 +39,7 @@ export default class Client {
     this.capabilities = new Set();
     this.channelsByID = new Set();
     this.channelsByName = new Set();
+    this.joinedFirehose = false;
 
     socket.pipe(createStream())
     .on('data', message => {
@@ -95,11 +96,8 @@ export default class Client {
   }
 
   handleClientMessage(msg) {
-    if (msg.command === 'PING') this.handleClientPING(msg);
-    else if (msg.command === 'CAP') this.handleClientCAP(msg);
-    else if (msg.command === 'NICK') this.handleClientNICK(msg);
-    else if (msg.command === 'PASS') this.handleClientPASS(msg);
-    else if (msg.command === 'JOIN') this.handleClientJOIN(msg);
+    const functionName = `handleClient${msg.command}`;
+    if (this[functionName]) this[functionName](msg);
   }
 
   handleClientPING(msg) {
@@ -125,11 +123,37 @@ export default class Client {
   handleClientJOIN(msg) {
     if (this.user) {
       _.each(msg.params[0].split(','), async channelName => {
+        channelName = channelName.toLowerCase();
+        if (this.channelsByID.has(channelName) || this.channelsByName.has(channelName) || !channelName) return;
         await this.user.joinChannel(this, channelName);
         this.send(`:${this.name}!${this.name}@${this.name}.tmi.twitch.tv JOIN ${channelName}`);
         if (channelName[0] === '#') this.channelsByName.add(channelName);
         else if (channelName[0] === '&') this.channelsByID.add(channelName.slice(1));
+        else if (channelName === '!firehose') this.joinedFirehose = true;
       });
+    } else {
+      this.sendNumeric('ERR_NOLOGIN', '', 'Not logged in yet.');
+    }
+  }
+
+  handleClientPART(msg) {
+    if (this.user) {
+      _.each(msg.params[0].split(','), async channelName => {
+        channelName = channelName.toLowerCase();
+        if (!this.channelsByID.has(channelName) && !this.channelsByName.has(channelName)) return;
+        await this.user.partChannel(this, channelName);
+        this.send(`:${this.name}!${this.name}@${this.name}.tmi.twitch.tv PART ${channelName}`);
+        if (channelName[0] === '#') this.channelsByName.remove(channelName);
+        else if (channelName[0] === '&') this.channelsByID.remove(channelName.slice(1));
+      });
+    } else {
+      this.sendNumeric('ERR_NOLOGIN', '', 'Not logged in yet.');
+    }
+  }
+
+  handleClientPRIVMSG(msg) {
+    if (this.user) {
+      this.user.sendMessage(msg.params[0], msg.trailing);
     } else {
       this.sendNumeric('ERR_NOLOGIN', '', 'Not logged in yet.');
     }
@@ -177,12 +201,17 @@ export default class Client {
     const channelsToEmit = [];
     if (this.channelsByName.has(msg.params[0])) channelsToEmit.push(msg.params[0]);
     if (this.channelsByID.has(msg.tags['room-id'])) channelsToEmit.push(`&${msg.tags['room-id']}`);
+    if (this.joinedFirehose) channelsToEmit.push('!firehose');
     msg.tags['channel-name'] = msg.params[0].slice(1);
 
     if (channelsToEmit.length > 0) {
       const rawTags = _.map(msg.tags, (val, key) => `${key}=${val}`).join(';');
       _.each(channelsToEmit, channel => {
-        this.send(`@${rawTags} :${msg.prefix} ${msg.command} ${channel} :${msg.trailing}`);
+        if (rawTags && this.capabilities.has('twitch.tv/tags')) {
+          if (msg.trailing) this.send(`@${rawTags} :${msg.prefix} ${msg.command} ${channel} :${msg.trailing}`);
+          else this.send(`@${rawTags} :${msg.prefix} ${msg.command} ${channel}`);
+        } else if (msg.trailing) this.send(`:${msg.prefix} ${msg.command} ${channel} :${msg.trailing}`);
+        else this.send(`:${msg.prefix} ${msg.command} ${channel}`);
       });
     }
   }

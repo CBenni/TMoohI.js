@@ -9,6 +9,8 @@ class Firehose extends EventEmitter {
     super();
 
     this.connection = null;
+    this.connected = false;
+    // TODO: reconnect? idk how thatll work.
   }
 
   connect() {
@@ -46,6 +48,7 @@ class Firehose extends EventEmitter {
 
     this.connection.addEventListener('open', info => {
       console.log('Connected to firehose', info);
+      this.connected = true;
       this.emit('connect', info);
     });
   }

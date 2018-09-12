@@ -20,5 +20,5 @@ _.each(argv, (val, key) => {
   _.set(settings, key, val);
 });
 
-console.log('Settings: ', settings);
+// console.log('Settings: ', settings);
 export default settings;

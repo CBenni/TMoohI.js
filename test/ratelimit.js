@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import { it, describe } from 'mocha';
 import perfNow from 'performance-now';
 import 'should';
 
@@ -29,7 +29,7 @@ class Child {
     log(`Increment #${cnt} called!`);
     return rateLimitManager.invoke('increment', {
       parent: this.parent,
-      interval: 1000,
+      interval: 100,
       limit: 3
     }, () => {
       this.events.push(Date.now());
@@ -39,7 +39,7 @@ class Child {
 }
 
 const options = {
-  interval: 1000,
+  interval: 100,
   limit: 3
 };
 
@@ -54,30 +54,39 @@ const testerFunction = () => {
 };
 
 const promises = [];
-log('First wave');
+// log('First wave');
 for (let i = 1; i <= Math.round(options.limit * 2.49); ++i) {
   promises.push(rateLimitManager.invoke('test', options, testerFunction));
 }
 
 setTimeout(() => {
-  log('Second wave');
+  // log('Second wave');
   for (let i = 1; i <= Math.round(options.limit * 2.3333); ++i) {
     promises.push(rateLimitManager.invoke('test', options, testerFunction));
   }
 }, options.interval / 10);
 
 
-setTimeout(() => {
-  log('Third wave');
-  for (let i = 1; i <= Math.round(options.limit); ++i) {
-    promises.push(rateLimitManager.invoke('test', options, testerFunction));
-  }
-  return Promise.all(promises).then(() => {
-    log('Invocation times: ', times);
-    for (let i = 0; i < times.length; ++i) {
-      for (let j = i + 1; j < times.length && (times[j] - times[i] < options.interval); ++j) {
-        (j - i).should.be.below(options.limit);
+function thirdWave() {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      // log('Third wave');
+      for (let i = 1; i <= Math.round(options.limit); ++i) {
+        promises.push(rateLimitManager.invoke('test', options, testerFunction));
       }
-    }
-  }).should.be.fulfilled();
-}, options.interval * 6);
+      return Promise.all(promises).then(() => {
+        // log('Invocation times: ', times);
+        for (let i = 0; i < times.length; ++i) {
+          for (let j = i + 1; j < times.length && (times[j] - times[i] < options.interval); ++j) {
+            (j - i).should.be.below(options.limit);
+          }
+        }
+        resolve();
+      }).should.be.fulfilled();
+    }, options.interval * 6);
+  });
+}
+
+describe('rate limited invocation times', () => {
+  it('invocation times should all be below the limit', () => thirdWave());
+});
