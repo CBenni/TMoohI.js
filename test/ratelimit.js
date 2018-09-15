@@ -87,6 +87,6 @@ function thirdWave() {
   });
 }
 
-describe('rate limited invocation times', () => {
+describe('ratelimits', () => {
   it('invocation times should all be below the limit', () => thirdWave());
 });

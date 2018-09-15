@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import settings from './settings';
 import TMIConnection from './tmiconnection';
 import { invokeRateLimit } from './helpers';
-import { getTwitchUser } from './twitchapi';
+import { twitchGetUser } from './twitchapi';
 import logger from './logger';
 import firehose from './firehose';
 import Channel from './channel';
@@ -70,6 +70,21 @@ export default class User extends EventEmitter {
     return null;
   }
 
+  retrieveChannelName(channelID) {
+    return invokeRateLimit('twitchAPI', this.context, async () => {
+      console.log('Getting channel name for', channelID);
+      try {
+        const user = await twitchGetUser(channelID, this.oauth.replace('oauth:', ''));
+        console.log('Got user', user);
+        return user.name;
+      } catch (err) {
+        logger.error(err);
+        console.error(err.response.body);
+      }
+      return null;
+    });
+  }
+
   async joinChannel(client, channel) {
     // channel is a string, either '#channelname' or '&channelid'
     if (!channel) return;
@@ -100,10 +115,7 @@ export default class User extends EventEmitter {
         // (this is done in the connection and channel managers and rename handlers)
       } else {
         // only case for us to run an HTTP request. This shouldnt happen in large joins, since thatll rate limit your ass.
-        channelObj.name = await invokeRateLimit('twitchAPI', this.context, async () => {
-          const user = await getTwitchUser(channelID);
-          return `#${user.name}`;
-        });
+
       }
     } else if (channel === '!firehose') {
       // nothing to do in this case, just set up a filter
@@ -220,9 +232,25 @@ export default class User extends EventEmitter {
   }
 
   async sendMessage(channel, text) {
-    const channelObj = this.getChannelObj(channel);
-    if (!channelObj) return null;
-    const channelName = await channelObj.name;
+    let ircName = null;
+    if (channel[0] === '#') {
+      ircName = channel;
+    } else {
+      const channelObj = this.getChannelObj(channel);
+      if (channelObj && channelObj._name) {
+        ircName = `#${channelObj._name}`;
+      } else {
+        const channelName = await this.retrieveChannelName(channelObj.id);
+        console.log('Got channel name: ', channelName);
+        if (channelName) {
+          if (channelObj) channelObj.name = channelName;
+          ircName = `#${channelName}`;
+        }
+      }
+    }
+
+    if (!ircName) throw new Error(`Channel ${channel} not found.`);
+
     return invokeRateLimit('message', {
       user: this,
       client: this.clients,
@@ -235,7 +263,7 @@ export default class User extends EventEmitter {
       } else {
         connectionToUse = _.sample(this.connections);
       }
-      connectionToUse.send(`PRIVMSG #${channelName} :${text}`);
+      connectionToUse.send(`PRIVMSG ${ircName} :${text}`);
     });
   }
 }

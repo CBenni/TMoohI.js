@@ -43,18 +43,18 @@ export function invokeRateLimit(limitID, context, callback) {
 }
 
 export function declareAsyncProperty(thisArg, name, value) {
-  let propertyValue = value;
+  thisArg[`_${name}`] = value;
   let propertyResolve = null;
   const propertyPromise = value ? Promise.resolve() : new Promise(resolve => {
     propertyResolve = resolve;
   });
   Object.defineProperty(thisArg, name, {
     get() {
-      return propertyPromise.then(() => propertyValue);
+      return propertyPromise.then(() => thisArg[`_${name}`]);
     },
     set(val) {
-      if (thisArg.emit) thisArg.emit(`change-${name}`, val, propertyValue);
-      propertyValue = val;
+      if (thisArg.emit) thisArg.emit(`change-${name}`, val, thisArg[`_${name}`]);
+      thisArg[`_${name}`] = val;
       if (propertyResolve) {
         propertyResolve();
         propertyResolve = null;

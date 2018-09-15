@@ -20,19 +20,21 @@ export default class ChannelTest extends EventEmitter {
 
 const channel = new ChannelTest('1234', null);
 
-describe('channel name promise', () => {
-  it('channel name should be fulfilled with "testName"', () =>
-    channel.name.should.be.fulfilledWith('testName'));
-});
-
 const event = sinon.spy();
-
 channel.on('change-name', event);
 
-channel.name = 'testName';
 
-describe('channel change-name event', () => {
+describe('declareAsyncProperty', () => {
+  it('channel name should be fulfilled with "testName"', () => {
+    channel.name = 'testName';
+    channel.name.should.be.fulfilledWith('testName');
+  });
   it('event should be called with "testName", null', () =>
     event.should.be.calledWith('testName', null));
+
+  it('event should be called with "testName2", "testName"', () => {
+    channel.name = 'testName2';
+    event.should.be.calledWith('testName2', 'testName');
+  });
 });
 

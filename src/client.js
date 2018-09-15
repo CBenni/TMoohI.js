@@ -49,6 +49,10 @@ export default class Client {
     .on('close', () => {
       logger.debug('Client connection closed', this);
       this.handleDisconnect();
+    })
+    .on('error', () => {
+      logger.error('Client errored out', this);
+      this.handleDisconnect();
     });
 
     this.messageCallback = message => this.handleTMIMessage(message);

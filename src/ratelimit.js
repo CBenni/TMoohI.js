@@ -57,8 +57,9 @@ export class RateLimit {
   }
 
   run(queueItem) {
+    let result;
     try {
-      const result = queueItem.callback(this);
+      result = queueItem.callback(this);
       if (result !== false) {
         this.addEvent();
       }
@@ -74,6 +75,7 @@ export class RateLimit {
       if (queueItem.reject) queueItem.reject(err);
       else throw err;
     }
+    return result;
   }
 
   addEvent() {
